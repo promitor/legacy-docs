@@ -11,14 +11,14 @@ You can easily run the documentation locally by using [Jekyll](https://jekyllrb.
 1. Navigate to the `docs` directory
 
 ```shell
-⚡ tkerkhove@tomkerkhove C:\promitor
-❯  bundle exec jekyll serve
+⚡ tkerkhove@tomkerkhove C:\promitor-legacy-docs
+❯  cd docs
 ```
 
 2. Serve documentation with Jekyll
 
 ```shell
-⚡ tkerkhove@tomkerkhove C:\promitor
+⚡ tkerkhove@tomkerkhove C:\promitor-legacy-docs
 ❯  bundle exec jekyll serve
 ```
 
