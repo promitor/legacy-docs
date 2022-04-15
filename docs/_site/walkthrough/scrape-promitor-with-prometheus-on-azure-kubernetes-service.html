@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Deploying Promitor, Prometheus, and Grafana on an AKS Cluster | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Deploying Promitor, Prometheus, and Grafana on an AKS Cluster" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/walkthrough/scrape-promitor-with-prometheus-on-azure-kubernetes-service.html" />
+<meta property="og:url" content="http://localhost:4000/walkthrough/scrape-promitor-with-prometheus-on-azure-kubernetes-service.html" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Deploying Promitor, Prometheus, and Grafana on an AKS Cluster" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/walkthrough/scrape-promitor-with-prometheus-on-azure-kubernetes-service.html","headline":"Deploying Promitor, Prometheus, and Grafana on an AKS Cluster","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <h2 id="introduction">Introduction</h2>
+
+<p>In this walkthrough, we’ll set up a basic monitoring solution with Promitor,
+Prometheus, and Grafana.</p>
+
+<p>In order to have a resource to monitor, we’ll create a Service Bus queue and add
+load to the queue with Service Bus Explorer.</p>
+
+<p>We’ll deploy Promitor, Prometheus, and Grafana to a Kubernetes cluster using Helm,
+and explain how each of these services connects and how to see output.</p>
+
+<p>We’ll also walk through setting up basic Grafana dashboard to visualize the metrics
+we’re monitoring.</p>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ul>
+  <li><strong><a href="#deploy-azure-infrastructure">Deploy Azure Infrastructure</a></strong>
+    <ul>
+      <li><a href="#create-a-resource-group">Create a Resource Group</a></li>
+      <li><a href="#create-a-service-principal">Create a Service Principal</a></li>
+      <li><a href="#create-a-service-bus-namespace-and-queue">Create a Service Bus Namespace and Queue</a></li>
+      <li><a href="#create-an-aks-cluster">Create an AKS Cluster</a></li>
+    </ul>
+  </li>
+  <li><strong><a href="#cluster-setup">Cluster Setup</a></strong>
+    <ul>
+      <li><a href="#get-credentials">Get credentials</a></li>
+    </ul>
+  </li>
+  <li><strong><a href="#deploy-promitor-and-prometheus">Deploy Promitor and Prometheus</a></strong>
+    <ul>
+      <li><a href="#create-a-metrics-declaration-for-promitor">Create a metrics declaration for Promitor</a></li>
+      <li><a href="#deploy-promitor-to-your-cluster-using-helm">Deploy Promitor to your cluster using Helm</a></li>
+      <li><a href="#install-prometheus">Install Prometheus</a></li>
+    </ul>
+  </li>
+  <li><strong><a href="#test-and-check-output">Test and check output</a></strong>
+    <ul>
+      <li><a href="#add-load-to-the-queue">Add load to the queue</a></li>
+      <li><a href="#see-promitor-&amp;-prometheus-output-via-port-forwarding">See Promitor &amp; Prometheus output via port-forwarding</a></li>
+    </ul>
+  </li>
+  <li><strong><a href="#visualization">Visualization</a></strong>
+    <ul>
+      <li><a href="#install-grafana">Install Grafana</a></li>
+      <li><a href="#add-prometheus-as-a-data-source">Add Prometheus as a data source</a></li>
+      <li><a href="#create-a-grafana-dashboard-for-queue-metrics">Create a Grafana dashboard for queue metrics</a></li>
+      <li><a href="#creating-a-kubernetes-dashboard">Creating a Kubernetes dashboard</a></li>
+    </ul>
+  </li>
+  <li><strong><a href="#delete-resources">Delete resources</a></strong></li>
+</ul>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+  <li>The <a href="https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest">Azure CLI</a></li>
+  <li><a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">kubectl</a>, the Kubernetes
+command-line tool. It can also be installed via the Azure CLI with <code class="language-plaintext highlighter-rouge">az aks install-cli</code>.</li>
+  <li><a href="https://helm.sh/docs/using_helm/#installing-the-helm-client">Helm</a>, a Kubernetes
+deployment manager</li>
+  <li><a href="https://github.com/paolosalvatori/ServiceBusExplorer/releases">Service Bus Explorer</a></li>
+</ul>
+
+<h2 id="deploy-azure-infrastructure">Deploy Azure Infrastructure</h2>
+
+<h3 id="create-a-resource-group">Create a Resource Group</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az group create <span class="nt">--name</span> PromitorRG <span class="nt">--location</span> eastus
+</code></pre></div></div>
+
+<p>Output:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/subscriptions/&lt;guid-subscription-id&gt;/resourceGroups/PromitorRG"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="create-a-service-principal">Create a Service Principal</h3>
+
+<p>Use the resource group creation output to add a scope to your service principal:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az ad sp create-for-rbac <span class="se">\</span>
+  <span class="nt">--role</span><span class="o">=</span><span class="s2">"Monitoring Reader"</span> <span class="se">\</span>
+  <span class="nt">--scopes</span><span class="o">=</span><span class="s2">"/subscriptions/&lt;guid-subscription-id&gt;/resourceGroups/PromitorRG"</span>
+</code></pre></div></div>
+
+<p>Which should output something similar to</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"appId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;guid-sp-app-id&gt;"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"displayName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"azure-cli-2019-03-29-19-21-58"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://azure-cli-2019-03-29-19-21-58"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"password"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;guid-sp-generated-password&gt;"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"tenant"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;guid-tenant-id&gt;"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Save this output as we will use the app ID, tenant ID, and password later on.</p>
+
+<h3 id="create-a-service-bus-namespace-and-queue">Create a Service Bus Namespace and Queue</h3>
+
+<p>First we’ll need to create a namespace. Service Bus Namespaces need to be globally
+unique, so we won’t use a default name in these commands.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az servicebus namespace create <span class="se">\</span>
+  <span class="nt">--resource-group</span> PromitorRG <span class="se">\</span>
+  <span class="nt">--name</span> &lt;service-bus-namespace&gt; <span class="se">\</span>
+  <span class="nt">--location</span> eastus
+</code></pre></div></div>
+
+<p>We’ll then create a queue in that namespace:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az servicebus queue create <span class="se">\</span>
+  <span class="nt">--resource-group</span> PromitorRG <span class="se">\</span>
+  <span class="nt">--namespace-name</span> &lt;service-bus-namespace&gt; <span class="se">\</span>
+  <span class="nt">--name</span> demo_queue
+</code></pre></div></div>
+
+<p>Finally, get the connection string for this Service Bus namespace for use later.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az servicebus namespace authorization-rule keys list <span class="se">\</span>
+  <span class="nt">--resource-group</span> PromitorRG <span class="se">\</span>
+  <span class="nt">--namespace-name</span> &lt;service-bus-namespace&gt; <span class="se">\</span>
+  <span class="nt">--name</span> RootManageSharedAccessKey <span class="se">\</span>
+  <span class="nt">--query</span> primaryConnectionString <span class="se">\</span>
+  <span class="nt">--output</span> tsv
+</code></pre></div></div>
+
+<h3 id="create-an-aks-cluster">Create an AKS Cluster</h3>
+
+<p>Create a cluster with:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az aks create <span class="se">\</span>
+  <span class="nt">--name</span> PromitorCluster <span class="se">\</span>
+  <span class="nt">--resource-group</span> PromitorRG <span class="se">\</span>
+  <span class="nt">--node-count</span> 1 <span class="se">\</span>
+  <span class="nt">--generate-ssh-keys</span>
+</code></pre></div></div>
+
+<h2 id="cluster-setup">Cluster Setup</h2>
+
+<h3 id="get-credentials">Get credentials</h3>
+
+<p>You can get your cluster’s credentials with</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az aks get-credentials <span class="se">\</span>
+  <span class="nt">--name</span> PromitorCluster <span class="se">\</span>
+  <span class="nt">--resource-group</span> PromitorRG
+</code></pre></div></div>
+
+<p>This will save these credentials to your kubeconfig file and set your new cluster
+as your current context for all <code class="language-plaintext highlighter-rouge">kubectl</code> commands.</p>
+
+<p>Verify your credentials and check that your cluster is up and running with
+<code class="language-plaintext highlighter-rouge">kubectl get nodes</code>.</p>
+
+<h2 id="deploy-promitor-and-prometheus">Deploy Promitor and Prometheus</h2>
+
+<h3 id="create-a-metrics-declaration-for-promitor">Create a metrics declaration for Promitor</h3>
+
+<p>Before deploying Promitor, you’ll need a values file with secrets &amp; a metric declaration
+file (these can also be the same file for ease of use). The yaml below will scrape
+one metric, queue length, from the queue created above.</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">azureAuthentication</span><span class="pi">:</span>
+  <span class="na">appId</span><span class="pi">:</span> <span class="s">&lt;guid-sp-app-id&gt;</span>
+  <span class="na">appKey</span><span class="pi">:</span> <span class="s">&lt;guid-sp-generated-password&gt;</span>
+
+<span class="na">azureMetadata</span><span class="pi">:</span>
+  <span class="na">tenantId</span><span class="pi">:</span> <span class="s">&lt;guid-tenant-id&gt;</span>
+  <span class="na">subscriptionId</span><span class="pi">:</span> <span class="s">&lt;guid-subscription-id&gt;</span>
+  <span class="na">resourceGroupName</span><span class="pi">:</span> <span class="s">PromitorRG</span>
+<span class="na">metricDefaults</span><span class="pi">:</span>
+  <span class="na">aggregation</span><span class="pi">:</span>
+    <span class="na">interval</span><span class="pi">:</span> <span class="s">00:05:00</span>
+  <span class="na">scraping</span><span class="pi">:</span>
+    <span class="na">schedule</span><span class="pi">:</span> <span class="s2">"</span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>
+<span class="na">metrics</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">demo_queue_size</span>
+    <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Amount</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">active</span><span class="nv"> </span><span class="s">messages</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">'demo_queue'</span><span class="nv"> </span><span class="s">queue"</span>
+    <span class="na">resourceType</span><span class="pi">:</span> <span class="s">ServiceBusNamespace</span>
+    <span class="na">azureMetricConfiguration</span><span class="pi">:</span>
+      <span class="na">metricName</span><span class="pi">:</span> <span class="s">ActiveMessages</span>
+      <span class="na">aggregation</span><span class="pi">:</span>
+        <span class="na">type</span><span class="pi">:</span> <span class="s">Total</span>
+    <span class="na">resources</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">namespace</span><span class="pi">:</span> <span class="s">&lt;service-bus-namespace&gt;</span>
+        <span class="na">queueName</span><span class="pi">:</span> <span class="s">demo_queue</span>
+</code></pre></div></div>
+
+<h3 id="deploy-promitor-to-your-cluster-using-helm">Deploy Promitor to your cluster using Helm</h3>
+
+<p>To deploy, we’ll first add the Promitor chart repository to helm:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm repo add promitor https://charts.promitor.io/
+helm repo update
+</code></pre></div></div>
+
+<p>With this repository added, we can deploy Promitor:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm <span class="nb">install </span>promitor-agent-scraper promitor/promitor-agent-scraper <span class="se">\</span>
+  <span class="nt">--values</span> your/path/to/metric-declaration.yaml
+</code></pre></div></div>
+
+<h3 id="install-prometheus">Install Prometheus</h3>
+
+<p><strong>Note: If you’re seeing errors installing Prometheus or Grafana from the Helm</strong>
+<strong>chart repository, make sure you run <code class="language-plaintext highlighter-rouge">helm repo update</code> before digging into the</strong>
+<strong>errors more. You might have an outdated copy of the chart.</strong></p>
+
+<p>Running the deployment command from the previous section should give you an output
+that includes a script similar to this one:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> <span class="o">&gt;</span> promitor-scrape-config.yaml <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh">
+extraScrapeConfigs: |
+  - job_name: promitor-agent-scraper
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        - promitor-agent-scraper.default.svc.cluster.local:80
+</span><span class="no">EOF
+</span>helm <span class="nb">install </span>stable/prometheus <span class="nt">-f</span> promitor-scrape-config.yaml
+</code></pre></div></div>
+
+<p>You can see this output again at any time by running <code class="language-plaintext highlighter-rouge">helm status promitor-agent-scraper</code>.</p>
+
+<p>Running these commands will create a Prometheus scraping configuration file in your
+current directory and deploy Prometheus to your cluster with that scraping configuration
+in addition to the default.</p>
+
+<h2 id="test-and-check-output">Test and check output</h2>
+
+<h3 id="add-load-to-the-queue">Add load to the queue</h3>
+
+<p>Now we’ll use Service Bus Explorer to add load to our Service Bus queue so there
+are meaningful metrics for Promitor to pick up.</p>
+
+<p>In Service Bus Explorer, you can connect to your namespace &amp; queue using a connection
+string. From there, right clicking on the queue in the side-bar should give you
+an option to ‘Send Message’ - from there, use the ‘Sender’ tab of that window to
+send bulk messages. Remember how many you send - you should see that number in the
+Promitor &amp; Prometheus output.</p>
+
+<h3 id="see-promitor--prometheus-output-via-port-forwarding">See Promitor &amp; Prometheus output via port-forwarding</h3>
+
+<p>Going back to your cluster, you should be able to see all Promitor &amp; Prometheus
+pods up and running with <code class="language-plaintext highlighter-rouge">kubectl get pods</code>.</p>
+
+<p>You can also see the services which provide a stable endpoint at which to reach
+the pods by running <code class="language-plaintext highlighter-rouge">kubectl get services</code>.</p>
+
+<p>This should give you a list with output similar to:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>NAME</th>
+      <th>TYPE</th>
+      <th>CLUSTER-IP</th>
+      <th>EXTERNAL-IP</th>
+      <th>PORT(S)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>promitor-agent-scraper</td>
+      <td>ClusterIP</td>
+      <td>10.0.#.#</td>
+      <td>&lt;none&gt;</td>
+      <td>80/TCP</td>
+    </tr>
+    <tr>
+      <td>&lt;prometheus-release-name&gt;-prometheus-server</td>
+      <td>ClusterIP</td>
+      <td>10.0.#.#</td>
+      <td>&lt;none&gt;</td>
+      <td>80/TCP</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Next to that, it should also list other services deployed by Prometheus.</p>
+
+<p>Let’s first look at the Promitor output!</p>
+
+<p>Run <code class="language-plaintext highlighter-rouge">kubectl port-forward svc/promitor-agent-scraper 8080:80</code> and check
+<a href="http://localhost:8080/metrics">http://localhost:8080/metrics</a>. You should see some information about your queue:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># HELP promitor_ratelimit_arm Indication how many calls are still available before Azure Resource Manager is going to throttle us.</span>
+<span class="c"># TYPE promitor_ratelimit_arm gauge</span>
+promitor_ratelimit_arm<span class="o">{</span><span class="nv">tenant_id</span><span class="o">=</span>&lt;guid-tenant-id&gt;,subscription_id<span class="o">=</span>&lt;guid-subscription-id&gt;,app_id<span class="o">=</span>&lt;guid-sp-app-id&gt;<span class="o">}</span> 11998 1558116465529
+<span class="c"># HELP demo_queue_size Amount of active messages of the 'demo_queue' queue</span>
+<span class="c"># TYPE demo_queue_size gauge</span>
+demo_queue_size 200 1558116465677
+</code></pre></div></div>
+
+<p>where 200 is the number of messages sent.</p>
+
+<p>We can also look at the Prometheus server and check that it’s pulling in metrics
+from Promitor.</p>
+
+<p>Cancel the previous port-forward command and run
+<code class="language-plaintext highlighter-rouge">kubectl port-forward svc/&lt;prometheus-release-name&gt;-prometheus-server 8080:80</code>.</p>
+
+<p>Now, if you check <a href="http://localhost:8080">http://localhost:8080</a>, you should be able to enter Prometheus
+queries.</p>
+
+<p>Query <code class="language-plaintext highlighter-rouge">demo_queue_size</code> and as long as all your pods are up and running and both
+Promitor and Prometheus have scraped metrics at least once, you should see a value
+that matches the number of messages in your queue.</p>
+
+<h2 id="visualization">Visualization</h2>
+
+<h3 id="install-grafana">Install Grafana</h3>
+
+<p>Grafana’s chart has a few default values you may not want long term - persistant
+storage is disabled and admin username/password is randomly generated - but for
+our sample the out-of-the-box install will work.</p>
+
+<p>Run <code class="language-plaintext highlighter-rouge">helm install grafana stable/grafana</code> and you should see output that
+includes this command:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get secret <span class="nt">--namespace</span> default grafana <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s2">"{.data.admin-password}"</span> | <span class="nb">base64</span> <span class="nt">--decode</span> <span class="p">;</span> <span class="nb">echo</span>
+</code></pre></div></div>
+
+<p>Run this to get your Grafana password.</p>
+
+<p>Now you can use <code class="language-plaintext highlighter-rouge">kubectl port-forward</code> again to log in to your Grafana dashboard.
+<code class="language-plaintext highlighter-rouge">kubectl port-forward svc/grafana 8080:80</code> will make your dashboard available at
+<a href="http://localhost:8080">http://localhost:8080</a>, and you can log in with username ‘admin’ and the password
+you retrieved.</p>
+
+<h3 id="add-prometheus-as-a-data-source">Add Prometheus as a data source</h3>
+
+<p>After logging in, you should see an option to “Add a Data Source.” Click that,
+and choose the Prometheus source type (if it’s not immediately visible, search
+for it).</p>
+
+<p>The only setting you should need to edit here is the URL, under the HTTP section.
+Within your cluster, <code class="language-plaintext highlighter-rouge">http://&lt;prometheus-release-name&gt;-prometheus-server.default.svc.cluster.local</code>
+should resolve to the Prometheus server service. (Default in that URL refers to
+the namespace - if you installed in a namespace other than default, change that.)</p>
+
+<p>Set your service’s name as the Prometheus URL in Grafana, and save the data source.
+It should tell you that the data source is working.</p>
+
+<h3 id="create-a-grafana-dashboard-for-queue-metrics">Create a Grafana dashboard for queue metrics</h3>
+
+<p>First, we’ll make a basic dashboard with the metric we set up in Promitor. Then
+you can use a pre-built dashboard to show Prometheus’ default Kubernetes metrics.</p>
+
+<p>Go to the + button on the sidebar, and choose “Dashboard”. To make a simple graph
+showing your queue size, you can write <code class="language-plaintext highlighter-rouge">demo_queue_size</code> in the query field. Click
+out of that input field and the graph should update.</p>
+
+<p>To see more, you can go back to Service Bus Explorer and send or receive messages.
+Your Grafana graph won’t update immediately, but you should see results in a few
+minutes.</p>
+
+<p>In order to see results without manually refreshing, find the dropdown menu in
+the top right corner that sets the time range of the graph. Here you can edit time
+range and refresh rate.</p>
+
+<p>Make sure to save your new dashboard before exiting the page.</p>
+
+<h3 id="creating-a-kubernetes-dashboard">Creating a Kubernetes dashboard</h3>
+
+<p>Now we’ll import a pre-created dashboard that shows Kubernetes metrics. There are
+multiple available on Grafana Lab’s dashboard site - try <a href="https://grafana.com/dashboards/6417">6417</a>.</p>
+
+<p>To import a dashboard, click the + button on the sidebar and choose “Import.” From
+there, you can either load a JSON file or enter the dashbord ID: 6417.</p>
+
+<p>Click “Load” and you will be given some configuration options. The only one that
+needs to be set is the Prometheus data source. From there, you should be able to
+create the dashboard and view metrics about your AKS cluster.</p>
+
+<h2 id="delete-resources">Delete resources</h2>
+
+<p>To delete all the resources used in this tutorial, run <code class="language-plaintext highlighter-rouge">az group delete --name PromitorRG</code>.</p>
+
+<p><a href="/">← back</a></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>

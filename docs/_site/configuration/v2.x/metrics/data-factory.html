@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Azure Data Factory Declaration | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Azure Data Factory Declaration" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/configuration/v2.x/metrics/data-factory.html" />
+<meta property="og:url" content="http://localhost:4000/configuration/v2.x/metrics/data-factory.html" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Azure Data Factory Declaration" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/configuration/v2.x/metrics/data-factory.html","headline":"Azure Data Factory Declaration","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <h2 id="azure-data-factory">Azure Data Factory</h2>
+
+<p><img src="https://img.shields.io/badge/Available%20Starting-v2.5-green.svg" alt="Availability Badge" /><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" /></p>
+
+<p>You can declare to scrape an Azure Data Factory resource via the <code class="language-plaintext highlighter-rouge">DataFactory</code> resource
+type.</p>
+
+<p>When using declared resources, the following fields need to be provided:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">factoryName</code> - The name of the Azure Data Factory resource</li>
+  <li><code class="language-plaintext highlighter-rouge">pipelineName</code> - The name of the data pipeline <em>(optional)</em></li>
+</ul>
+
+<p>All supported metrics are documented in the official <a href="https://docs.microsoft.com/en-us/azure/azure-monitor/essentials/metrics-supported#microsoftdatafactoryfactories">Azure Monitor documentation</a>.</p>
+
+<p>The following scraper-specific metric label will be added:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">pipeline_name</code> - Name of the data pipeline.</li>
+</ul>
+
+<p>Example:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">azure_data_factory_pipeline_run_successful</span>
+  <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Amount</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">successful</span><span class="nv"> </span><span class="s">runs</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">'data-pipeline-example'</span><span class="nv"> </span><span class="s">pipline</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">Azure</span><span class="nv"> </span><span class="s">Data</span><span class="nv"> </span><span class="s">Factory"</span>
+  <span class="na">resourceType</span><span class="pi">:</span> <span class="s">DataFactory</span>
+  <span class="na">azureMetricConfiguration</span><span class="pi">:</span>
+    <span class="na">metricName</span><span class="pi">:</span> <span class="s">PipelineSucceededRuns</span>
+    <span class="na">aggregation</span><span class="pi">:</span>
+      <span class="na">type</span><span class="pi">:</span> <span class="s">Total</span>
+  <span class="na">resources</span><span class="pi">:</span> <span class="c1"># Optional, required when no resource discovery is configured</span>
+  <span class="pi">-</span> <span class="na">factoryName</span><span class="pi">:</span> <span class="s">promitor-data-factory</span>
+    <span class="na">pipelineName</span><span class="pi">:</span> <span class="s">data-pipeline-example</span>
+  <span class="na">resourceDiscoveryGroups</span><span class="pi">:</span> <span class="c1"># Optional, requires Promitor Resource Discovery agent (https://promitor.io/concepts/how-it-works#using-resource-discovery)</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">data-factory-landscape</span>
+</code></pre></div></div>
+
+<!-- markdownlint-disable MD033 -->
+<p><a href="/configuration/v2.x/metrics">← back to metrics declarations</a><br />
+<a href="/">← back to introduction</a>
+<!-- markdownlint-enable --></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>
