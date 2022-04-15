@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Operating Promitor | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Operating Promitor" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/operations/" />
+<meta property="og:url" content="http://localhost:4000/operations/" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Operating Promitor" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/operations/","headline":"Operating Promitor","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <p>Here is an overview of how you can operate Promitor.</p>
+
+<ul>
+  <li><a href="#health">Health</a>
+    <ul>
+      <li><a href="#consuming-the-health-endpoint">Consuming the health endpoint</a></li>
+    </ul>
+  </li>
+  <li><a href="#discovery">Discovery</a>
+    <ul>
+      <li><a href="#subscription">Subscription</a></li>
+      <li><a href="#resource-groups">Resource Groups</a></li>
+    </ul>
+  </li>
+  <li><a href="#performance">Performance</a>
+    <ul>
+      <li><a href="#scraping-prometheus-endpoint">Scraping Prometheus endpoint</a></li>
+      <li><a href="#scraping-azure-monitor">Scraping Azure Monitor</a></li>
+    </ul>
+  </li>
+  <li><a href="#system">System</a>
+    <ul>
+      <li><a href="#consuming-the-system-endpoint">Consuming the System endpoint</a></li>
+      <li><a href="#exploring-our-rest-apis">Exploring our REST APIs</a></li>
+    </ul>
+  </li>
+  <li><a href="#integrations">Integrations</a>
+    <ul>
+      <li><a href="#azure-resource-manager-api---consumption--throttling">Azure Resource Manager API - Consumption &amp; Throttling</a></li>
+      <li><a href="#azure-resource-graph">Azure Resource Graph</a></li>
+      <li><a href="#azure-monitor">Azure Monitor</a></li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="health">Health</h2>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-Yes-green.svg" alt="Scraper Support Badge" /></p>
+
+<p>Promitor provides a basic health endpoint that indicates the state of the scraper.</p>
+
+<p>Health endpoints can be useful for monitoring the scraper, running sanity tests
+after deployments or use it for sending liveness / health probes.</p>
+
+<h3 id="consuming-the-health-endpoint">Consuming the health endpoint</h3>
+
+<p>You can check the status with a simple <code class="language-plaintext highlighter-rouge">GET</code>:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>❯ curl <span class="nt">-i</span> <span class="nt">-X</span> GET <span class="s2">"http://&lt;uri&gt;/api/v1/health"</span>
+</code></pre></div></div>
+
+<p>Health is currently indicated via the HTTP response status:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">200 OK</code> - The scraper is healthy</li>
+  <li><code class="language-plaintext highlighter-rouge">503 Service Unavailable</code> - The scraper is unhealthy</li>
+</ul>
+
+<p>The endpoint provides more details on integration with following dependencies:</p>
+
+<ul>
+  <li><strong>Promitor Resource Discovery</strong> (when configured)</li>
+</ul>
+
+<h2 id="discovery">Discovery</h2>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-No-red.svg" alt="Scraper Support Badge" /></p>
+
+<p><strong>Promitor Resource Discovery</strong> provides a way to discover the resources for our Scraper agent to dynamically scrape resources.</p>
+
+<p>Next to that, it provides a variety of system metrics that provides information concerning your Azure landscape.</p>
+
+<h3 id="subscription">Subscription</h3>
+
+<p>Our <code class="language-plaintext highlighter-rouge">promitor_azure_landscape_subscription_info</code> metrics provides an overview of all the Azure subscriptions that
+ Promitor is able to discover in your Azure Landscape.</p>
+
+<p>It provides the following tags with more information:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - Id of the Azure tenant</li>
+  <li><code class="language-plaintext highlighter-rouge">subscription_name</code> - Name of the Azure subscription</li>
+  <li><code class="language-plaintext highlighter-rouge">subscription_id</code> - Id of the Azure subscription</li>
+  <li><code class="language-plaintext highlighter-rouge">state</code> - Indication of the state of the subscription (<a href="https://docs.microsoft.com/en-us/azure/cost-management-billing/manage/subscription-states">docs</a>)</li>
+  <li><code class="language-plaintext highlighter-rouge">spending_limit</code> - Indication whether or not there is a spending limit</li>
+  <li><code class="language-plaintext highlighter-rouge">quota_id</code> - Id of the Azure subscription used to manage quotas</li>
+  <li><code class="language-plaintext highlighter-rouge">authorization</code> - Type of authorization that is being used</li>
+</ul>
+
+<div class="language-prometheus highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># HELP promitor_azure_landscape_subscription_info Provides information concerning the Azure subscriptions in the landscape that Promitor has access to.</span>
+<span class="c"># TYPE promitor_azure_landscape_subscription_info gauge</span>
+<span class="n">promitor_azure_landscape_subscription_info</span><span class="p">{</span><span class="na">tenant_id</span><span class="o">=</span><span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span><span class="p">,</span><span class="na">subscription_name</span><span class="o">=</span><span class="s2">"Windows Azure MSDN - Visual Studio Ultimate"</span><span class="p">,</span><span class="na">subscription_id</span><span class="o">=</span><span class="s2">"0329dd2a-59dc-4493-aa54-cb01cb027dc2"</span><span class="p">,</span><span class="na">state</span><span class="o">=</span><span class="s2">"Enabled"</span><span class="p">,</span><span class="na">spending_limit</span><span class="o">=</span><span class="s2">"On"</span><span class="p">,</span><span class="na">quota_id</span><span class="o">=</span><span class="s2">"MSDN_2014-09-01"</span><span class="p">,</span><span class="na">authorization</span><span class="o">=</span><span class="s2">"RoleBased"</span><span class="p">}</span> <span class="mi">1</span> <span class="mi">1628779903451</span>
+<span class="n">promitor_azure_landscape_subscription_info</span><span class="p">{</span><span class="na">tenant_id</span><span class="o">=</span><span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span><span class="p">,</span><span class="na">subscription_name</span><span class="o">=</span><span class="s2">"Visual Studio Enterprise"</span><span class="p">,</span><span class="na">subscription_id</span><span class="o">=</span><span class="s2">"0f9d7fea-99e8-4768-8672-06a28514f77e"</span><span class="p">,</span><span class="na">state</span><span class="o">=</span><span class="s2">"Enabled"</span><span class="p">,</span><span class="na">spending_limit</span><span class="o">=</span><span class="s2">"Off"</span><span class="p">,</span><span class="na">quota_id</span><span class="o">=</span><span class="s2">"Sponsored_2016-01-01"</span><span class="p">,</span><span class="na">authorization</span><span class="o">=</span><span class="s2">"RoleBased"</span><span class="p">}</span> <span class="mi">1</span> <span class="mi">1628779903451</span>
+</code></pre></div></div>
+
+<h3 id="resource-groups">Resource Groups</h3>
+
+<p>Our <code class="language-plaintext highlighter-rouge">promitor_azure_landscape_resource_group_info</code> metrics provides an overview of all the Azure resource groups that
+ Promitor is able to discover in your Azure Landscape across all your subscriptions.</p>
+
+<p>It provides the following tags with more information:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - Id of the Azure tenant</li>
+  <li><code class="language-plaintext highlighter-rouge">subscription_id</code> - Id of the Azure subscription</li>
+  <li><code class="language-plaintext highlighter-rouge">resource_group_name</code> - Name of the Azure resource group</li>
+  <li><code class="language-plaintext highlighter-rouge">region</code> - Region in which the resource group is located</li>
+  <li><code class="language-plaintext highlighter-rouge">provisioning_state</code> - State of the resource group</li>
+  <li><code class="language-plaintext highlighter-rouge">managed_by</code> - Id of the Azure resource managing this resource group, for example an Azure Kubernetes Service cluster.</li>
+</ul>
+
+<div class="language-prometheus highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># HELP promitor_azure_landscape_resource_group_info Provides information concerning the Azure resource groups in the landscape that Promitor has access to.</span>
+<span class="c"># TYPE promitor_azure_landscape_resource_group_info gauge</span>
+<span class="n">promitor_azure_landscape_resource_group_info</span><span class="p">{</span><span class="na">tenant_id</span><span class="o">=</span><span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span><span class="p">,</span><span class="na">subscription_id</span><span class="o">=</span><span class="s2">"0f9d7fea-99e8-4768-8672-06a28514f77e"</span><span class="p">,</span><span class="na">resource_group_name</span><span class="o">=</span><span class="s2">"NetworkWatcherRG"</span><span class="p">,</span><span class="na">region</span><span class="o">=</span><span class="s2">"westeurope"</span><span class="p">,</span><span class="na">provisioning_state</span><span class="o">=</span><span class="s2">"Succeeded"</span><span class="p">,</span><span class="na">managed_by</span><span class="o">=</span><span class="s2">"n/a"</span><span class="p">}</span> <span class="mi">1</span> <span class="mi">1628779903423</span>
+<span class="n">promitor_azure_landscape_resource_group_info</span><span class="p">{</span><span class="na">tenant_id</span><span class="o">=</span><span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span><span class="p">,</span><span class="na">subscription_id</span><span class="o">=</span><span class="s2">"0f9d7fea-99e8-4768-8672-06a28514f77e"</span><span class="p">,</span><span class="na">resource_group_name</span><span class="o">=</span><span class="s2">"promitor-testing-resource-discovery-eu"</span><span class="p">,</span><span class="na">region</span><span class="o">=</span><span class="s2">"westeurope"</span><span class="p">,</span><span class="na">provisioning_state</span><span class="o">=</span><span class="s2">"Succeeded"</span><span class="p">,</span><span class="na">managed_by</span><span class="o">=</span><span class="s2">"n/a"</span><span class="p">}</span> <span class="mi">1</span> <span class="mi">1628779903423</span>
+<span class="n">promitor_azure_landscape_resource_group_info</span><span class="p">{</span><span class="na">tenant_id</span><span class="o">=</span><span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span><span class="p">,</span><span class="na">subscription_id</span><span class="o">=</span><span class="s2">"0f9d7fea-99e8-4768-8672-06a28514f77e"</span><span class="p">,</span><span class="na">resource_group_name</span><span class="o">=</span><span class="s2">"MC_keda-demos_keda-demos_westeurope"</span><span class="p">,</span><span class="na">region</span><span class="o">=</span><span class="s2">"westeurope"</span><span class="p">,</span><span class="na">provisioning_state</span><span class="o">=</span><span class="s2">"Succeeded"</span><span class="p">,</span><span class="na">managed_by</span><span class="o">=</span><span class="s2">"/subscriptions/0f9d7fea-99e8-4768-8672-06a28514f77e/resourcegroups/keda-demos/providers/Microsoft.ContainerService/managedClusters/keda-demos"</span><span class="p">}</span> <span class="mi">1</span> <span class="mi">1628779903423</span>
+</code></pre></div></div>
+
+<h2 id="performance">Performance</h2>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-Yes-green.svg" alt="Scraper Support Badge" /></p>
+
+<p>You can easily monitor the performance of Promitor through the following Prometheus metrics:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_dotnet_collection_count_total</code> - Provides information related to garbage collection count per generation</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_dotnet_totalmemory</code> - Provides information related to total known allocated memory</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_cpu_seconds_total</code> - Provides information related to total user &amp; system CPU time spent in seconds</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_virtual_bytes</code> - Provides information related to virtual memory size</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_working_set</code> - Provides information related to process working set</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_private_bytes</code> - Provides information related to process private memory size</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_num_threads</code> - Provides information related to total number of threads</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_processid</code> - Provides information related to process ID</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_process_start_time_seconds</code> - Provides information related to the start time of the process since
+ unix epoch in seconds</li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_runtime_http_request_duration_seconds</code> - Provides information related to the performance of HTTP routes and outcomes</li>
+</ul>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code># HELP promitor_runtime_http_request_duration_seconds duration histogram of http responses labeled with: status_code, method, path
+# TYPE promitor_runtime_http_request_duration_seconds histogram
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.005"} 30
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.01"} 31
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.025"} 31
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.05"} 32
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.075"} 33
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.1"} 33
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.25"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.5"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="0.75"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="1"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="2.5"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="5"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="7.5"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="10"} 34
+promitor_runtime_http_request_duration_seconds_bucket{status_code="200",method="GET",path="/scrape",le="+Inf"} 34
+promitor_runtime_http_request_duration_seconds_sum{status_code="200",method="GET",path="/scrape"} 0.27116070000000003
+promitor_runtime_http_request_duration_seconds_count{status_code="200",method="GET",path="/scrape"} 34
+</code></pre></div></div>
+
+<h3 id="scraping-prometheus-endpoint">Scraping Prometheus endpoint</h3>
+
+<p>Every Promitor agent supports exposing Prometheus metrics:</p>
+
+<ul>
+  <li><strong>Resource Discovery agent</strong> - Exposed on <code class="language-plaintext highlighter-rouge">/metrics</code> endpoint</li>
+  <li><strong>Scraper agent</strong> - Exposed through Prometheus metric sink (<a href="/configuration/v2.x/runtime/scraper#prometheus-scraping-endpoint">docs</a>)</li>
+</ul>
+
+<h3 id="scraping-azure-monitor">Scraping Azure Monitor</h3>
+
+<p>You can easily monitor the performance of Promitor Scraper agent integrating with Azure Monitor
+ through the following Prometheus metrics:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">promitor_scrape_error</code> - Provides indication of all configured metrics that were unable to be scraped in Azure Monitor</li>
+</ul>
+
+<pre><code class="language-prom"># HELP promitor_scrape_error Provides an indication that the scraping of the resource has failed
+# TYPE promitor_scrape_error gauge
+promitor_scrape_error{metric_name="promitor_demo_app_insights_dependency_duration_200_OK",resource_group="docker-hub-metrics",resource_name="Microsoft.Insights/Components/docker-hub-metrics",resource_type="Generic",subscription_id="0f9d7fea-99e8-4768-8672-06a28514f77e",tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf"} 1 1623691623231
+</code></pre>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">promitor_scrape_success</code> - Provides indication of all configured metrics that were successfully scraped and reported in
+the configured metric sinks</li>
+</ul>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code># HELP promitor_scrape_success Provides an indication that the scraping of the resource was successful
+# TYPE promitor_scrape_success gauge
+promitor_scrape_success{metric_name="promitor_demo_automation_update_deployment_machine_runs",resource_group="promitor-sources",resource_name="promitor-sandbox",resource_type="AutomationAccount",subscription_id="0f9d7fea-99e8-4768-8672-06a28514f77e",tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf"} 1 1623691626335
+</code></pre></div></div>
+
+<h2 id="system">System</h2>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-Yes-green.svg" alt="Scraper Support Badge" /></p>
+
+<p>Promitor provides a basic system endpoint that provides information about itself such as its version.</p>
+
+<h3 id="consuming-the-system-endpoint">Consuming the System endpoint</h3>
+
+<p>You can check the status with a simple <code class="language-plaintext highlighter-rouge">GET</code>:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code>❯ curl <span class="nt">-i</span> <span class="nt">-X</span> GET <span class="s2">"http://&lt;uri&gt;/api/v1/system"</span>
+</code></pre></div></div>
+
+<h3 id="exploring-our-rest-apis">Exploring our REST APIs</h3>
+
+<p>We provide API documentation to make it easier for you to consume our REST APIs them:</p>
+
+<ul>
+  <li><strong>OpenAPI 3.0 format</strong> <img src="https://img.shields.io/badge/Available%20Starting-v1.1-green.svg" alt="Availability Badge" />
+    <ul>
+      <li>You can explore it with OpenAPI UI on <code class="language-plaintext highlighter-rouge">/api/docs</code></li>
+      <li>You can find the raw documentation on <code class="language-plaintext highlighter-rouge">/api/v1/docs.json</code></li>
+    </ul>
+  </li>
+  <li><strong>Swagger 2.0 format</strong> <a href="http://changelog.promitor.io/"><img src="https://img.shields.io/badge/Deprecated%20as%20of-v1.1-red" alt="Deprecation Badge" /></a>
+    <ul>
+      <li>You can explore it with Swagger UI on <code class="language-plaintext highlighter-rouge">/swagger</code></li>
+      <li>You can find the raw documentation on <code class="language-plaintext highlighter-rouge">/swagger/v1/swagger.json</code></li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="integrations">Integrations</h2>
+
+<h3 id="azure-resource-manager-api---consumption--throttling">Azure Resource Manager API - Consumption &amp; Throttling</h3>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-No-red.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-Yes-green.svg" alt="Scraper Support Badge" /></p>
+
+<p>Promitor exposes runtime metrics to provide insights on the API consumption of
+Azure Resource Manager API:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">promitor_ratelimit_arm</code> - Indication how many calls are still available before
+Azure Resource Manager is going to throttle us. Metric provides following labels:
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - <em>Id of the tenant that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">subscription_id</code> - <em>Id of the subscription that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">app_id</code> - <em>Id of the application that is being used to interact with API</em></li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_ratelimit_arm_throttled</code> - Indication whether or not we are being throttled by Azure Resource Manager
+ (ARM). Metric provides following labels:
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - <em>Id of the tenant that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">subscription_id</code> - <em>Id of the subscription that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">app_id</code> - <em>Id of the application that is being used to interact with API</em></li>
+    </ul>
+  </li>
+</ul>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code># HELP promitor_ratelimit_arm Indication how many calls are still available before Azure Resource Manager (ARM) is going to throttle us.
+# TYPE promitor_ratelimit_arm gauge
+promitor_ratelimit_arm{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",subscription_id="0329dd2a-59dc-4493-aa54-cb01cb027dc2",app_id="ceb249a3-44ce-4c90-8863-6776336f5b7e"} 11995 1629719527020
+promitor_ratelimit_arm{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",subscription_id="0f9d7fea-99e8-4768-8672-06a28514f77e",app_id="ceb249a3-44ce-4c90-8863-6776336f5b7e"} 11989 1629719532626
+# HELP promitor_ratelimit_arm_throttled Indication concerning Azure Resource Manager are being throttled. (1 = yes, 0 = no).
+# TYPE promitor_ratelimit_arm_throttled gauge
+promitor_ratelimit_arm_throttled{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",subscription_id="0329dd2a-59dc-4493-aa54-cb01cb027dc2",app_id="ceb249a3-44ce-4c90-8863-6776336f5b7e"} 0 1629719527020
+promitor_ratelimit_arm_throttled{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",subscription_id="0f9d7fea-99e8-4768-8672-06a28514f77e",app_id="ceb249a3-44ce-4c90-8863-6776336f5b7e"} 0 1629719532626
+</code></pre></div></div>
+
+<p>You can read more about the Azure Resource Manager limitations on <a href="https://docs.microsoft.com/en-us/azure/azure-resource-manager/resource-manager-request-limits">docs.microsoft.com</a>.</p>
+
+<h3 id="azure-resource-graph">Azure Resource Graph</h3>
+
+<p><img src="https://img.shields.io/badge/Support%20for%20Resource%20Discovery-Yes-green.svg" alt="Resource Discovery Support Badge" />
+<img src="https://img.shields.io/badge/Support%20for%20Scraper-No-red.svg" alt="Scraper Support Badge" /></p>
+
+<p>Promitor exposes runtime metrics to provide insights on the API consumption of
+Azure Resource Graph:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">promitor_ratelimit_resource_graph_remaining</code> - Indication how many calls are still available before
+Azure Resource Manager is going to throttle us. Metric provides following labels:
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - <em>Id of the tenant that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">cloud</code> - <em>Name of the cloud</em></li>
+      <li><code class="language-plaintext highlighter-rouge">auth_mode</code> - <em>Authentication mode to authenticate with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">app_id</code> - <em>Id of the application that is being used to interact with</em></li>
+    </ul>
+  </li>
+  <li><code class="language-plaintext highlighter-rouge">promitor_ratelimit_resource_graph_throttled</code> - Indication whether or not we are being throttled by Azure Resource
+ Graph. Metric provides following labels:
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">tenant_id</code> - <em>Id of the tenant that is being interacted with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">cloud</code> - <em>Name of the cloud</em></li>
+      <li><code class="language-plaintext highlighter-rouge">auth_mode</code> - <em>Authentication mode to authenticate with</em></li>
+      <li><code class="language-plaintext highlighter-rouge">app_id</code> - <em>Id of the application that is being used to interact with</em></li>
+    </ul>
+  </li>
+</ul>
+
+<div class="language-text highlighter-rouge"><div class="highlight"><pre class="highlight"><code># HELP promitor_ratelimit_resource_graph_remaining Indication how many calls are still available before Azure Resource Graph is going to throttle us.
+# TYPE promitor_ratelimit_resource_graph_remaining gauge
+promitor_ratelimit_resource_graph_remaining{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",cloud="Global",auth_mode="ServicePrincipal",app_id="67882a00-21d3-4ee7-b32a-430ea0768cd3"} 9 1629719863738
+# HELP promitor_ratelimit_resource_graph_throttled Indication concerning Azure Resource Graph are being throttled. (1 = yes, 0 = no).
+# TYPE promitor_ratelimit_resource_graph_throttled gauge
+promitor_ratelimit_resource_graph_throttled{tenant_id="e0372f7f-a362-47fb-9631-74a5c4ba8bbf",cloud="Global",auth_mode="ServicePrincipal",app_id="67882a00-21d3-4ee7-b32a-430ea0768cd3"} 0 1629719863738
+</code></pre></div></div>
+
+<p>You can read more about the Azure Resource Graph throttling on <a href="https://docs.microsoft.com/en-us/azure/governance/resource-graph/overview#throttling">docs.microsoft.com</a>.</p>
+
+<h3 id="azure-monitor">Azure Monitor</h3>
+
+<p>Promitor interacts with Azure Monitor API to scrape all the required metrics.</p>
+
+<p>During troubleshooting it can be interesting to gain insights on what the API returns, for which you can opt-in.</p>
+
+<p>You can opt-in for it by configuring the <a href="/configuration/v2.x/runtime/scraper#azure-monitor">runtime telemetry</a>.</p>
+
+<p><a href="/">← back</a></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>

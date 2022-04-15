@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Declaring resource discovery groups | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Declaring resource discovery groups" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/configuration/v2.x/resource-discovery.html" />
+<meta property="og:url" content="http://localhost:4000/configuration/v2.x/resource-discovery.html" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Declaring resource discovery groups" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/configuration/v2.x/resource-discovery.html","headline":"Declaring resource discovery groups","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <p>Promitor Resource Discovery allows you to declare the Azure landscape to explore and define resource discovery groups
+ in YAML.</p>
+
+<p>Resource discovery groups represent a group of Azure resources of a given type that can be scraped by Promitor Scraper
+ and supports an <a href="#supported-azure-services">extensive list of supported services</a>.</p>
+
+<p>As part of the resource discovery group declaration, you can choose to filter resources by adding inclusion criteria
+ that resources must comply with based on:</p>
+
+<ul>
+  <li><strong>Subscription</strong> - Defines a subset of subscriptions defined in the Azure landscape</li>
+  <li><strong>Resource Group</strong> - Defines a list of resource groups which contains the resources.</li>
+  <li><strong>Tags</strong> - Defines a list of <a href="https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources">Azure tags</a>
+ with which the resources have to be annotated.</li>
+  <li><strong>Regions</strong> - Defines a list of Azure regions in which the regions the resources are located.</li>
+</ul>
+
+<p>Here is an example of a full declaration:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">version</span><span class="pi">:</span> <span class="s">v1</span>
+<span class="na">azureLandscape</span><span class="pi">:</span>
+  <span class="na">tenantId</span><span class="pi">:</span> <span class="s">e0372f7f-a362-47fb-9631-74a5c4ba8bbf</span>
+  <span class="na">subscriptions</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="s">SUBSCRIPTON-ID-ABC</span>
+  <span class="pi">-</span> <span class="s">SUBSCRIPTON-ID-DEF</span>
+  <span class="pi">-</span> <span class="s">SUBSCRIPTON-ID-GHI</span>
+  <span class="na">cloud</span><span class="pi">:</span> <span class="s">China</span>
+<span class="na">resourceDiscoveryGroups</span><span class="pi">:</span>
+<span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">container-registry-landscape</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">ContainerRegistry</span>
+<span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">filtered-logic-apps-landscape</span>
+  <span class="na">type</span><span class="pi">:</span> <span class="s">LogicApp</span>
+  <span class="na">criteria</span><span class="pi">:</span>
+    <span class="na">include</span><span class="pi">:</span>
+      <span class="na">subscriptions</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s">SUBSCRIPTON-ID-ABC</span>
+      <span class="pi">-</span> <span class="s">SUBSCRIPTON-ID-GHI</span>
+      <span class="na">resourceGroups</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s">promitor-resource-group-1</span>
+      <span class="pi">-</span> <span class="s">promitor-resource-group-2</span>
+      <span class="na">tags</span><span class="pi">:</span>
+        <span class="na">app</span><span class="pi">:</span> <span class="s">promitor-1|promitor-2</span>
+        <span class="na">region</span><span class="pi">:</span> <span class="s">europe</span>
+      <span class="na">regions</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="s">northeurope</span>
+      <span class="pi">-</span> <span class="s">westeurope</span>
+</code></pre></div></div>
+
+<h2 id="specification">Specification</h2>
+
+<p>As Promitor evolves we need to change the structure of our resource discovery declaration.</p>
+
+<p><code class="language-plaintext highlighter-rouge">version: {version}</code> - Version of declaration that is used. Allowed
+values are <code class="language-plaintext highlighter-rouge">v1</code>. <em>(Required)</em></p>
+
+<h3 id="azure-landscape">Azure Landscape</h3>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">azureLandscape.tenantId</code> - The id of the Azure tenant that will be queried. <em>(Required)</em></li>
+  <li><code class="language-plaintext highlighter-rouge">azureLandscape.subscriptions</code> - List of Azure subscriptions in the Azure tenant to discover resources in. <em>(Required)</em></li>
+  <li><code class="language-plaintext highlighter-rouge">azureLandscape.cloud</code> - The name of the Azure cloud to use. Options are <code class="language-plaintext highlighter-rouge">Global</code> (default), <code class="language-plaintext highlighter-rouge">China</code>, <code class="language-plaintext highlighter-rouge">UsGov</code> &amp; <code class="language-plaintext highlighter-rouge">Germany</code>.</li>
+</ul>
+
+<h3 id="resource-discovery-groups">Resource Discovery Groups</h3>
+
+<p>Every resource discovery group that is being declared needs to define the following fields:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">name</code> - Name of the resource discovery group which will be used in metrics declaration of Promitor Scraper. <em>(Required)</em></li>
+  <li><code class="language-plaintext highlighter-rouge">type</code> - Type of Azure resources that must be discovered, see <a href="#supported-azure-services">“Supported Azure Services</a>
+ for a full list of supported types. <em>(Required)</em></li>
+  <li><code class="language-plaintext highlighter-rouge">criteria</code> - Criteria to fine-tune discovered resource.</li>
+</ul>
+
+<h4 id="criteria">Criteria</h4>
+
+<p>As of now, we only allow to define criteria that resources have to meet before they are included in the resource
+ discovery group:</p>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">subscriptions</code> - A list of subscription(s) in which the resource is allowed to be located.</li>
+  <li><code class="language-plaintext highlighter-rouge">resourceGroups</code> - A list of resource group(s) in which the resource is allowed to be located.</li>
+  <li><code class="language-plaintext highlighter-rouge">tags</code> - A list of <a href="https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources">Azure tags</a>
+ and the expected values (exact or regular expression) with which the resources have to be annotated. (Uses <code class="language-plaintext highlighter-rouge">or</code>)</li>
+  <li><code class="language-plaintext highlighter-rouge">regions</code> - A list of Azure region(s) in which the resource is allowed to be located.</li>
+</ul>
+
+<h2 id="supported-azure-services">Supported Azure Services</h2>
+
+<p>Dynamic resource discovery is supported for the following scrapers:</p>
+
+<ul>
+  <li><a href="metrics/api-management">Azure API Management</a></li>
+  <li><a href="metrics/application-gateway">Azure Application Gateway</a></li>
+  <li><a href="metrics/application-insights">Azure Application Insights</a></li>
+  <li><a href="metrics/app-plan">Azure App Plan</a></li>
+  <li><a href="metrics/automation-account">Azure Automation</a></li>
+  <li><a href="metrics/redis-cache">Azure Cache for Redis</a></li>
+  <li><a href="metrics/redis-enterprise-cache">Azure Cache for Redis Enterprise</a></li>
+  <li><a href="metrics/cdn">Azure Content Delivery Network (CDN)</a></li>
+  <li><a href="metrics/container-instances">Azure Container Instances</a></li>
+  <li><a href="metrics/container-registry">Azure Container Registry</a></li>
+  <li><a href="metrics/cosmos-db">Azure Cosmos DB</a></li>
+  <li><a href="metrics/data-factory">Azure Data Factory</a></li>
+  <li><a href="metrics/data-share">Azure Data Share</a></li>
+  <li><a href="metrics/postgresql">Azure Database for PostgreSQL</a></li>
+  <li><a href="metrics/maria-db">Azure Database for MariaDB</a></li>
+  <li><a href="metrics/event-hubs">Azure Event Hubs</a></li>
+  <li><a href="metrics/express-route-circuit">Azure Express Route Circuit</a></li>
+  <li><a href="metrics/front-door">Azure Front Door</a></li>
+  <li><a href="metrics/function-app">Azure Function App</a></li>
+  <li><a href="metrics/iot-hub">Azure IoT Hub</a></li>
+  <li><a href="metrics/iot-hub-device-provisioning-service">Azure IoT Hub Device Provisioning Service (DPS)</a></li>
+  <li><a href="metrics/key-vault">Azure Key Vault</a></li>
+  <li><a href="metrics/kubernetes">Azure Kubernetes Service</a></li>
+  <li><a href="metrics/load-balancer">Azure Load Balancer</a></li>
+  <li><a href="metrics/logic-apps">Azure Logic Apps</a></li>
+  <li><a href="metrics/monitor-autoscale">Azure Monitor Autoscale</a></li>
+  <li><a href="metrics/network-gateway">Azure Network Gateway</a></li>
+  <li><a href="metrics/network-interface">Azure Network Interface</a></li>
+  <li><a href="metrics/service-bus-namespace">Azure Service Bus Namespace</a></li>
+  <li><a href="metrics/sql-database">Azure SQL Database</a></li>
+  <li><a href="metrics/sql-elastic-pool">Azure SQL Elastic Pool</a></li>
+  <li><a href="metrics/sql-managed-instance">Azure SQL Managed Instance</a></li>
+  <li><a href="metrics/storage-account">Azure Storage (Account)</a></li>
+  <li><a href="metrics/synapse-apache-spark-pool">Azure Synapse (Apache Spark pool)</a></li>
+  <li><a href="metrics/synapse-sql-pool">Azure Synapse (SQL pool)</a></li>
+  <li><a href="metrics/synapse-workspace">Azure Synapse (Workspace)</a></li>
+  <li><a href="metrics/virtual-machine">Azure Virtual Machine</a></li>
+  <li><a href="metrics/virtual-machine-scale-set">Azure Virtual Machine Scale Set (VMSS)</a></li>
+  <li><a href="metrics/virtual-network">Azure Virtual Network</a></li>
+  <li><a href="metrics/web-app">Azure Web App</a></li>
+</ul>
+
+<p><a href="/">← back</a></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>

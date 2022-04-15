@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Using Managed Identity with Promitor on Azure Kubernetes Service | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Using Managed Identity with Promitor on Azure Kubernetes Service" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/walkthrough/use-promitor-with-managed-identity.html" />
+<meta property="og:url" content="http://localhost:4000/walkthrough/use-promitor-with-managed-identity.html" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Using Managed Identity with Promitor on Azure Kubernetes Service" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/walkthrough/use-promitor-with-managed-identity.html","headline":"Using Managed Identity with Promitor on Azure Kubernetes Service","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <h2 id="introduction">Introduction</h2>
+
+<p>This walkthrough will allow you to deploy Promitor that uses <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed Identity</a>
+ on an Azure Kubernetes Service cluster to scrape Azure Service Bus metrics, using no-password authentication.</p>
+
+<p>In order to achieve this, we will use the <a href="https://github.com/Azure/aad-pod-identity">AAD Pod Identity project</a> to
+ manage the identities and authentication.</p>
+
+<blockquote>
+  <p>⚠ This only works with Azure Kubernetes Service - Learn more about <a href="https://docs.microsoft.com/en-us/azure/aks/use-managed-identity">Managed Identity in Azure Kubernetes Service</a>
+in the official Microsoft documentation.</p>
+</blockquote>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ul>
+  <li><a href="#introduction">Introduction</a></li>
+  <li><a href="#table-of-contents">Table of Contents</a></li>
+  <li><a href="#prerequisites">Prerequisites</a></li>
+  <li><a href="#deploying-the-azure-infrastructure">Deploying the Azure Infrastructure</a>
+    <ul>
+      <li><a href="#preparing-script">Preparing script</a></li>
+      <li><a href="#creating-an-azure-resource-group">Creating an Azure Resource Group</a></li>
+      <li><a href="#creating-an-azure-service-bus-namespace--queue">Creating an Azure Service Bus Namespace &amp; Queue</a></li>
+      <li><a href="#creating-an-azure-kubernetes-service-cluster">Creating an Azure Kubernetes Service Cluster</a></li>
+    </ul>
+  </li>
+  <li><a href="#setting-up-our-cluster">Setting up our cluster</a>
+    <ul>
+      <li><a href="#getting-the-cluster-credentials">Getting The Cluster Credentials</a></li>
+      <li><a href="#get-azure-kubernetes-service-managed-identity--cluster-resource-group">Get Azure Kubernetes Service managed identity &amp; cluster resource group</a></li>
+    </ul>
+  </li>
+  <li><a href="#getting-our-cluster-ready-to-use-aad-pod-identity">Getting our cluster ready to use AAD Pod Identity</a>
+    <ul>
+      <li><a href="#granting-our-clusters-managed-identity-required-permissions-in-azure">Granting our cluster’s managed identity required permissions in Azure</a></li>
+      <li><a href="#installing-aad-pod-identity">Installing AAD Pod Identity</a></li>
+      <li><a href="#creating-a-user-assigned-managed-identity-for-promitor">Creating a user-assigned managed identity for Promitor</a></li>
+      <li><a href="#bind-your-managed-identity-to-our-pods-through-aad-pod-identity">Bind your Managed Identity to our Pods, through AAD Pod Identity</a></li>
+      <li><a href="#verifying-the-aad-pod-identity-installation">Verifying the AAD Pod Identity installation</a></li>
+    </ul>
+  </li>
+  <li><a href="#deploying-promitor-with-managed-identity">Deploying Promitor with Managed Identity</a>
+    <ul>
+      <li><a href="#create-a-metrics-declaration-for-promitor">Create a metrics declaration for Promitor</a></li>
+      <li><a href="#deploy-promitor-to-your-cluster-using-helm">Deploy Promitor to your cluster using Helm</a></li>
+      <li><a href="#verifying-the-scraped-output-in-promitor">Verifying the scraped output in Promitor</a></li>
+    </ul>
+  </li>
+  <li><a href="#cleaning-up">Cleaning up</a></li>
+</ul>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+  <li><a href="https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest">Azure CLI</a>,
+to be able to deploy resources through the command line.</li>
+  <li><a href="https://kubernetes.io/docs/tasks/tools/install-kubectl/">kubectl</a>, the Kubernetes
+command-line tool. It can also be installed via the Azure CLI with <code class="language-plaintext highlighter-rouge">az aks install-cli</code>.</li>
+  <li><a href="https://helm.sh/docs/using_helm/#installing-the-helm-client">Helm</a>, a Kubernetes
+deployment manager.</li>
+  <li><a href="https://docs.microsoft.com/en-us/windows/wsl/">WSL</a>, if you are using a Windows machine to deploy your whole solution.</li>
+</ul>
+
+<h2 id="deploying-the-azure-infrastructure">Deploying the Azure Infrastructure</h2>
+
+<h3 id="preparing-script">Preparing script</h3>
+
+<p>Since we are going to use a lot of bash scripts with different variables values,
+it can be a good idea to parameterize everything.</p>
+
+<p>Let’s start by <strong>exporting</strong> all the values we need:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># SUBSCRIPTION_ID represents the Azure subscription id you will use to access your Azure resources</span>
+<span class="nb">export </span><span class="nv">SUBSCRIPTION_ID</span><span class="o">=</span>&lt;subscription-id&gt;
+
+<span class="c"># RG_NAME represents the resource group name where your cluster will be deployed</span>
+<span class="nb">export </span><span class="nv">RG_NAME</span><span class="o">=</span>PromitorWithManagedIdentityRG
+
+<span class="c"># LOCATION represents the Azure region where your cluster will be deployed</span>
+<span class="nb">export </span><span class="nv">LOCATION</span><span class="o">=</span>northeurope
+
+<span class="c"># CLUSTER_NAME represents the name of your Azure Kubernetes Service Cluster</span>
+<span class="nb">export </span><span class="nv">CLUSTER_NAME</span><span class="o">=</span>PromitorCluster
+
+<span class="c"># AD_POD_IDENTITY_NAME represents the name of the Azure AD identity that will be assigned to Promitor.</span>
+<span class="c"># Be careful, should be lower case alphanumeric characters, '-' or '.'</span>
+<span class="nb">export </span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="o">=</span>promitor-identity
+
+<span class="c"># As an example, we are going to use a service bus from where we want to grab some metrics, through Promitor</span>
+<span class="c"># SERVICE_BUS_NAMESPACE represents the name of your Azure Service Bus namespace.</span>
+<span class="c"># Be careful as Azure Service Bus Namespaces need to be globally unique.</span>
+<span class="nb">export </span><span class="nv">SERVICE_BUS_NAMESPACE</span><span class="o">=</span>PromitorUniqueNameServiceBus
+
+<span class="c"># SERVICE_BUS_QUEUE represents the name of you Azure Service Bus queue.</span>
+<span class="nb">export </span><span class="nv">SERVICE_BUS_QUEUE</span><span class="o">=</span>demo_queue
+</code></pre></div></div>
+
+<h3 id="creating-an-azure-resource-group">Creating an Azure Resource Group</h3>
+
+<p>First, let’s create an Azure resource group in which we’ll group all our resources:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az group create <span class="nt">--name</span> <span class="nv">$RG_NAME</span> <span class="nt">--location</span> <span class="nv">$LOCATION</span>
+<span class="o">{</span>
+  <span class="s2">"id"</span>: <span class="s2">"/subscriptions/&lt;subscription-id&gt;/resourceGroups/&lt;resource-group-name&gt;"</span>,
+  <span class="s2">"location"</span>: <span class="s2">"&lt;location-id&gt;"</span>,
+  <span class="s2">"managedBy"</span>: null,
+  <span class="s2">"name"</span>: <span class="s2">"&lt;resource-group-name&gt;"</span>,
+  <span class="s2">"properties"</span>: <span class="o">{</span>
+    <span class="s2">"provisioningState"</span>: <span class="s2">"Succeeded"</span>
+  <span class="o">}</span>,
+  <span class="s2">"tags"</span>: null,
+  <span class="s2">"type"</span>: <span class="s2">"Microsoft.Resources/resourceGroups"</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<h3 id="creating-an-azure-service-bus-namespace--queue">Creating an Azure Service Bus Namespace &amp; Queue</h3>
+
+<p>First we’ll need to create an Azure Service Bus namespace that provides metrics in Azure Monitor.</p>
+
+<p>These metrics will be scraped by Promitor and made available to the configured metric sinks.</p>
+
+<blockquote>
+  <p>💡 Consider this to be an example of metrics that you’d want to use in Prometheus, StatsD, …</p>
+</blockquote>
+
+<p>Let’s create the Azure Service Bus namespace:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az servicebus namespace create <span class="se">\</span>
+  <span class="nt">--resource-group</span> <span class="nv">$RG_NAME</span> <span class="se">\</span>
+  <span class="nt">--name</span> <span class="nv">$SERVICE_BUS_NAMESPACE</span> <span class="se">\</span>
+  <span class="nt">--location</span> <span class="nv">$LOCATION</span>
+</code></pre></div></div>
+
+<p>After that, we’ll create a queue in that namespace:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az servicebus queue create <span class="se">\</span>
+  <span class="nt">--resource-group</span> <span class="nv">$RG_NAME</span> <span class="se">\</span>
+  <span class="nt">--namespace-name</span> <span class="nv">$SERVICE_BUS_NAMESPACE</span> <span class="se">\</span>
+  <span class="nt">--name</span> <span class="nv">$SERVICE_BUS_QUEUE</span>
+</code></pre></div></div>
+
+<h3 id="creating-an-azure-kubernetes-service-cluster">Creating an Azure Kubernetes Service Cluster</h3>
+
+<p>Create an Azure Kubernetes Service cluster that uses a system-assigned managed identity:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az aks create <span class="nt">--resource-group</span> <span class="nv">$RG_NAME</span> <span class="se">\</span>
+    <span class="nt">--name</span> <span class="nv">$CLUSTER_NAME</span> <span class="se">\</span>
+    <span class="nt">--generate-ssh-keys</span> <span class="se">\</span>
+    <span class="nt">--node-count</span> 1 <span class="se">\</span>
+    <span class="nt">--enable-managed-identity</span>
+
+...
+<span class="s2">"servicePrincipalProfile"</span>: <span class="o">{</span>
+    <span class="s2">"clientId"</span>: <span class="s2">"msi"</span>
+  <span class="o">}</span>
+...
+</code></pre></div></div>
+
+<p>Once created, the output will indicate that it is using managed identity.</p>
+
+<h2 id="setting-up-our-cluster">Setting up our cluster</h2>
+
+<h3 id="getting-the-cluster-credentials">Getting The Cluster Credentials</h3>
+
+<p>In order to interact with the cluster by using <code class="language-plaintext highlighter-rouge">kubectl</code>, we need to be able to authenticate to it.</p>
+
+<p>You can get the credentials for your Kubernetes cluster using this command:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az aks get-credentials <span class="nt">--name</span> <span class="nv">$CLUSTER_NAME</span> <span class="nt">--resource-group</span> <span class="nv">$RG_NAME</span>
+Merged <span class="s2">"&lt;cluster-name&gt;"</span> as current context <span class="k">in</span> /home/tom/.kube/config
+</code></pre></div></div>
+
+<p>This saves the credentials in your kubeconfig file and uses it as your current context for all <code class="language-plaintext highlighter-rouge">kubectl</code> commands.</p>
+
+<p>Verify that you can connect and your cluster is up and running :</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>kubectl get nodes
+NAME                                STATUS   ROLES   AGE   VERSION
+aks-agentpool-34594731-vmss000000   Ready    agent   15d   v1.19.7
+aks-agentpool-34594731-vmss000001   Ready    agent   15d   v1.19.7
+aks-agentpool-34594731-vmss000002   Ready    agent   15d   v1.19.7
+</code></pre></div></div>
+
+<h3 id="get-azure-kubernetes-service-managed-identity--cluster-resource-group">Get Azure Kubernetes Service managed identity &amp; cluster resource group</h3>
+
+<p>To be able to configure AAD Pod Identity component, we need information from our new Azure Kubernetes Service cluster:</p>
+
+<p>First, we need to get the <strong>name of the cluster resource group</strong> where the AKS internal resources have been deployed.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">echo</span> <span class="s2">"Retrieving cluster resource group"</span>
+<span class="nb">export </span><span class="nv">aks_rg_name</span><span class="o">=</span><span class="si">$(</span>az aks show <span class="nt">-g</span> <span class="nv">$RG_NAME</span> <span class="nt">-n</span> <span class="nv">$CLUSTER_NAME</span> <span class="nt">--query</span> nodeResourceGroup <span class="nt">-otsv</span><span class="si">)</span>
+</code></pre></div></div>
+
+<p>This is a generated resource group that typically uses <code class="language-plaintext highlighter-rouge">MC_{resource-group}_{cluster-name}_{region}</code>, for example <code class="language-plaintext highlighter-rouge">MC_promitor-landscape_promitor_westeurope</code>.</p>
+
+<p>Second, we need the <strong>identity of our cluster</strong>. This is the system-assigned identity of our cluster that is used to
+ access Azure resources.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">echo</span> <span class="s2">"Retrieving cluster identity ID, which will be used for role assignment"</span>
+<span class="nb">export </span><span class="nv">aks_mi_identity</span><span class="o">=</span><span class="s2">"</span><span class="si">$(</span>az aks show <span class="nt">-g</span> <span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span> <span class="nt">-n</span> <span class="k">${</span><span class="nv">CLUSTER_NAME</span><span class="k">}</span> <span class="nt">--query</span> identityProfile.kubeletidentity.clientId <span class="nt">-otsv</span><span class="si">)</span><span class="s2">"</span>
+</code></pre></div></div>
+
+<p>This identity is managed by Azure, since we have used the <code class="language-plaintext highlighter-rouge">--enable-managed-identity</code> option during cluster creation.</p>
+
+<h2 id="getting-our-cluster-ready-to-use-aad-pod-identity">Getting our cluster ready to use AAD Pod Identity</h2>
+
+<h3 id="granting-our-clusters-managed-identity-required-permissions-in-azure">Granting our cluster’s managed identity required permissions in Azure</h3>
+
+<p>In this walkthrough we are going to configure the <strong>managed identity for our cluster</strong> to allow AAD Pod Identity to access
+ required resources in Azure.</p>
+
+<blockquote>
+  <p>Learn more about the <a href="https://azure.github.io/aad-pod-identity/docs/getting-started/role-assignment/#performing-role-assignments">the required role assignments for AAD Pod Identity</a>
+or have a general overview in the <a href="https://azure.github.io/aad-pod-identity/">official documentation</a>.</p>
+</blockquote>
+
+<p>In order to be able to use AAD Pod Identity, our cluster needs to be able to:</p>
+
+<ul>
+  <li>Manage identities in our application &amp; cluster resource group</li>
+  <li>Manage the virtual machines that are part of the cluster, to use the assigned identity</li>
+</ul>
+
+<p>You can easily do this as following:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">echo</span> <span class="s2">"Assigning 'Managed Identity Operator' role to </span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2"> on resource group </span><span class="k">${</span><span class="nv">aks_rg_name</span><span class="k">}</span><span class="s2">"</span>
+az role assignment create <span class="nt">--role</span> <span class="s2">"Managed Identity Operator"</span> <span class="nt">--assignee</span> <span class="s2">"</span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2">"</span> <span class="nt">--scope</span> <span class="s2">"/subscriptions/</span><span class="k">${</span><span class="nv">SUBSCRIPTION_ID</span><span class="k">}</span><span class="s2">/resourcegroups/</span><span class="k">${</span><span class="nv">aks_rg_name</span><span class="k">}</span><span class="s2">"</span>
+
+<span class="nb">echo</span> <span class="s2">"Assigning 'Virtual Machine Contributor' role to </span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2"> on resource group </span><span class="k">${</span><span class="nv">aks_rg_name</span><span class="k">}</span><span class="s2">"</span>
+az role assignment create <span class="nt">--role</span> <span class="s2">"Virtual Machine Contributor"</span> <span class="nt">--assignee</span> <span class="s2">"</span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2">"</span> <span class="nt">--scope</span> <span class="s2">"/subscriptions/</span><span class="k">${</span><span class="nv">SUBSCRIPTION_ID</span><span class="k">}</span><span class="s2">/resourcegroups/</span><span class="k">${</span><span class="nv">aks_rg_name</span><span class="k">}</span><span class="s2">"</span>
+
+<span class="nb">echo</span> <span class="s2">"Assigning 'Managed Identity Operator' role to </span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2"> on resource group </span><span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span><span class="s2">"</span>
+az role assignment create <span class="nt">--role</span> <span class="s2">"Managed Identity Operator"</span> <span class="nt">--assignee</span> <span class="s2">"</span><span class="k">${</span><span class="nv">aks_mi_identity</span><span class="k">}</span><span class="s2">"</span> <span class="nt">--scope</span> <span class="s2">"/subscriptions/</span><span class="k">${</span><span class="nv">SUBSCRIPTION_ID</span><span class="k">}</span><span class="s2">/resourcegroups/</span><span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span><span class="s2">"</span>
+</code></pre></div></div>
+
+<h3 id="installing-aad-pod-identity">Installing AAD Pod Identity</h3>
+
+<p>To deploy AAD Pod Identity, we need to add the Helm chart repository:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>helm repo add aad-pod-identity https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts
+<span class="s2">"aad-pod-identity"</span> has been added to your repositories
+</code></pre></div></div>
+
+<p>Update all your Helm repositories to use the latest and greatest:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>helm repo update
+Hang tight <span class="k">while </span>we grab the latest from your chart repositories...
+...Successfully got an update from the <span class="s2">"aad-pod-identity"</span> chart repository
+Update Complete. ⎈Happy Helming!⎈
+</code></pre></div></div>
+
+<p>Lastly, install the Helm chart into your cluster:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm <span class="nb">install </span>aad-pod-identity aad-pod-identity/aad-pod-identity <span class="nt">--set</span> nmi.allowNetworkPluginKubenet<span class="o">=</span><span class="nb">true</span>
+</code></pre></div></div>
+
+<h3 id="creating-a-user-assigned-managed-identity-for-promitor">Creating a user-assigned managed identity for Promitor</h3>
+
+<p>In order to let Promitor to authenticate to Azure, we have two options:</p>
+
+<ol>
+  <li>Re-ue the managed identity of our cluster, or (syste-assigned)</li>
+  <li>Create a new identity that we will assign to our Promitor pods (user-assigned)</li>
+</ol>
+
+<p>In order to <a href="https://en.wikipedia.org/wiki/Separation_of_concerns">separate our concerns</a>, we will create a new
+ identity for it:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">echo</span> <span class="s2">"Create identity </span><span class="nv">$AD_POD_IDENTITY_NAME</span><span class="s2"> in resource group </span><span class="nv">$RG_NAME</span><span class="s2">"</span>
+az identity create <span class="nt">-g</span> <span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span> <span class="nt">-n</span> <span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span>
+</code></pre></div></div>
+
+<p>Our new identity will be used by <strong>Promitor</strong> to access <strong>Azure Monitor</strong> to get metrics by using its assigned
+ <strong>RBAC roles assignements</strong>:</p>
+
+<p>First, we will get the client &amp; resource id of our identity:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">export </span><span class="nv">AD_POD_IDENTITY_CLIENT_ID</span><span class="o">=</span><span class="si">$(</span>az identity show <span class="nt">-g</span> <span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span> <span class="nt">-n</span> <span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span> <span class="nt">--query</span> <span class="s2">"clientId"</span> <span class="nt">-o</span> tsv<span class="si">)</span>
+<span class="nb">export </span><span class="nv">AD_POD_IDENTITY_RESOURCE_ID</span><span class="o">=</span><span class="si">$(</span>az identity show <span class="nt">-g</span> <span class="k">${</span><span class="nv">RG_NAME</span><span class="k">}</span> <span class="nt">-n</span> <span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span> <span class="nt">--query</span> <span class="s2">"id"</span> <span class="nt">-o</span> tsv<span class="si">)</span>
+</code></pre></div></div>
+
+<p>Next, we will assign the <code class="language-plaintext highlighter-rouge">Monitoring Reader</code> role to our identity on our resource group to scrape our Azure Service Bus namespace:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>az role assignment create <span class="nt">--role</span> <span class="s2">"Monitoring Reader"</span> <span class="nt">--scope</span> <span class="s2">"/subscriptions/</span><span class="nv">$SUBSCRIPTION_ID</span><span class="s2">/resourceGroups/</span><span class="nv">$RG_NAME</span><span class="s2">"</span> <span class="nt">--assignee</span> <span class="s2">"</span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_CLIENT_ID</span><span class="k">}</span><span class="s2">"</span>
+<span class="o">{</span>
+  <span class="s2">"canDelegate"</span>: null,
+  <span class="s2">"condition"</span>: null,
+  <span class="s2">"conditionVersion"</span>: null,
+  <span class="s2">"description"</span>: null,
+  <span class="s2">"id"</span>: <span class="s2">"/subscriptions/&lt;subscription-id&gt;/resourceGroups/&lt;resource-group-name&gt;/providers/Microsoft.Authorization/roleAssignments/92b1566a-2346-43f7-a093-1fd5871d4de8"</span>,
+  <span class="s2">"name"</span>: <span class="s2">"92b1566a-2346-43f7-a093-1fd5871d4de8"</span>,
+  <span class="s2">"principalId"</span>: <span class="s2">"&lt;promitor-identity-id&gt;"</span>,
+  <span class="s2">"principalType"</span>: <span class="s2">"ServicePrincipal"</span>,
+  <span class="s2">"resourceGroup"</span>: <span class="s2">"&lt;resource-group-name&gt;"</span>,
+  <span class="s2">"roleDefinitionId"</span>: <span class="s2">"/subscriptions/&lt;subscription-id&gt;/providers/Microsoft.Authorization/roleDefinitions/43d0d8ad-25c7-4714-9337-8ba259a9fe05"</span>,
+  <span class="s2">"scope"</span>: <span class="s2">"/subscriptions/&lt;subscription-id&gt;/resourceGroups/&lt;resource-group-name&gt;"</span>,
+  <span class="s2">"type"</span>: <span class="s2">"Microsoft.Authorization/roleAssignments"</span>
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>In order to verify our role assignement, you can use this command:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>az role assignment list <span class="nt">--assignee</span> <span class="nv">$AD_POD_IDENTITY_CLIENT_ID</span> <span class="nt">-g</span> <span class="nv">$RG_NAME</span> | jq <span class="nt">-r</span> <span class="s1">'.[].roleDefinitionName'</span>
+</code></pre></div></div>
+
+<blockquote>
+  <p>💡 <em>It can take some times before the identity is correctly propagated in Azure Active Directory.</em>
+<em>So far if you encountered an error where the identity is not found, please wait 60 sec and retry</em></p>
+</blockquote>
+
+<h3 id="bind-your-managed-identity-to-our-pods-through-aad-pod-identity">Bind your Managed Identity to our Pods, through AAD Pod Identity</h3>
+
+<p>Now that our identity is created, we can tell AAD Pod Identity that we want to bind our Azure AD identity to our pods:</p>
+
+<p>First, we will define the identity that we want to assign:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh"> | kubectl apply -f -
+apiVersion: "aadpodidentity.k8s.io/v1"
+kind: AzureIdentity
+metadata:
+  name: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span><span class="sh">
+spec:
+  type: 0 # 0 - user assigned MSI, 1 - service principal
+  resourceID: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_RESOURCE_ID</span><span class="k">}</span><span class="sh">
+  clientID: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_CLIENT_ID</span><span class="k">}</span><span class="sh">
+</span><span class="no">EOF
+</span></code></pre></div></div>
+
+<p>Next, we want to define to what pods we want to link it:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> <span class="o">&lt;&lt;</span><span class="no">EOF</span><span class="sh"> | kubectl apply -f -
+apiVersion: "aadpodidentity.k8s.io/v1"
+kind: AzureIdentityBinding
+metadata:
+  name: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span><span class="sh">-binding
+spec:
+  azureIdentity: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span><span class="sh">
+  selector: </span><span class="k">${</span><span class="nv">AD_POD_IDENTITY_NAME</span><span class="k">}</span><span class="sh">
+</span><span class="no">EOF
+</span></code></pre></div></div>
+
+<p>You can verify that the resources were created successfully as following:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl get azureidentity
+kubectl get azureidentitybinding
+</code></pre></div></div>
+
+<h3 id="verifying-the-aad-pod-identity-installation">Verifying the AAD Pod Identity installation</h3>
+
+<p>Before going further, we will check if our AAD Pod Identity is deployed &amp; configured correctly.</p>
+
+<p>We will spin up a pod and use the Azure CLI to authenticate:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl run azure-cli <span class="nt">-it</span> <span class="nt">--image</span><span class="o">=</span>mcr.microsoft.com/azure-cli <span class="nt">--labels</span><span class="o">=</span><span class="nv">aadpodidbinding</span><span class="o">=</span><span class="nv">$AD_POD_IDENTITY_NAME</span> /bin/bash
+</code></pre></div></div>
+
+<p>Note that we are adding <code class="language-plaintext highlighter-rouge">aadpodidbinding</code> as a label, which is linking the pod to the AAD Pod Identity binding
+ that we have just created.</p>
+
+<blockquote>
+  <p><em><strong>Warning:</strong></em> It can take some times to Aad Pod Identity to bind the identity to your deployed container.
+If you encountered an error, relaunch the <code class="language-plaintext highlighter-rouge">az login -i --debug</code> command after 60 sec.</p>
+</blockquote>
+
+<p>Next, we will run <code class="language-plaintext highlighter-rouge">az login -i --debug</code> to see the different steps it takes:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Once you are log in the container, and have the bash command line available, try to login using the Managed Identity:</span>
+<span class="c"># If you don't see a command prompt, try pressing enter.</span>
+<span class="nv">$ </span>bash-5.0# az login <span class="nt">-i</span> <span class="nt">--debug</span>
+msrestazure.azure_active_directory: MSI: Retrieving a token from http://169.254.169.254/metadata/identity/oauth2/token, with payload <span class="o">{</span><span class="s1">'resource'</span>: <span class="s1">'https://management.core.windows.net/'</span>, <span class="s1">'api-version'</span>: <span class="s1">'2018-02-01'</span><span class="o">}</span>
+msrestazure.azure_active_directory: MSI: Token retrieved
+cli.azure.cli.core._profile: MSI: token was retrieved. Now trying to initialize <span class="nb">local </span>accounts...
+...
+<span class="o">[</span>
+  <span class="o">{</span>
+    <span class="s2">"environmentName"</span>: <span class="s2">"AzureCloud"</span>,
+    <span class="s2">"homeTenantId"</span>: <span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span>,
+    <span class="s2">"id"</span>: <span class="s2">"0f9d7fea-99e8-4768-8672-06a28514f77e"</span>,
+    <span class="s2">"isDefault"</span>: <span class="nb">true</span>,
+    <span class="s2">"managedByTenants"</span>: <span class="o">[</span>
+      <span class="o">{</span>
+        <span class="s2">"tenantId"</span>: <span class="s2">"2f4a9838-26b7-47ee-be60-ccc1fdec5953"</span>
+      <span class="o">}</span>
+    <span class="o">]</span>,
+    <span class="s2">"name"</span>: <span class="s2">"Visual Studio Enterprise"</span>,
+    <span class="s2">"state"</span>: <span class="s2">"Enabled"</span>,
+    <span class="s2">"tenantId"</span>: <span class="s2">"e0372f7f-a362-47fb-9631-74a5c4ba8bbf"</span>,
+    <span class="s2">"user"</span>: <span class="o">{</span>
+      <span class="s2">"assignedIdentityInfo"</span>: <span class="s2">"MSI"</span>,
+      <span class="s2">"name"</span>: <span class="s2">"systemAssignedIdentity"</span>,
+      <span class="s2">"type"</span>: <span class="s2">"servicePrincipal"</span>
+    <span class="o">}</span>
+  <span class="o">}</span>
+<span class="o">]</span>
+</code></pre></div></div>
+
+<p>If your Azure CLI container is able to retrieve some information from Azure
+without having to log in with your credentials,
+it means the CLI is using your Managed Identity, through the Pod Identity Binding.</p>
+
+<p>You may have a result indicating you are log in, using a <strong>System Assigned Identity</strong></p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"user"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"assignedIdentityInfo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MSI"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"systemAssignedIdentity"</span><span class="p">,</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="deploying-promitor-with-managed-identity">Deploying Promitor with Managed Identity</h2>
+
+<h3 id="create-a-metrics-declaration-for-promitor">Create a metrics declaration for Promitor</h3>
+
+<p>Before deploying Promitor, we will create a values file for our Helm deployment.</p>
+
+<p>In the configuration, we define what Azure resource that we want to scrape and that we want to use managed identity.</p>
+
+<p>Here is an example:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">azureAuthentication</span><span class="pi">:</span>
+  <span class="na">mode</span><span class="pi">:</span> <span class="s">SystemAssignedManagedIdentity</span>
+  <span class="na">identity</span><span class="pi">:</span>
+    <span class="na">binding</span><span class="pi">:</span> <span class="s">&lt;aad-pod-identity-name&gt;</span>              <span class="c1"># &lt;- This is the value of AD_POD_IDENTITY_NAME environment variable</span>
+<span class="na">azureMetadata</span><span class="pi">:</span>
+  <span class="na">tenantId</span><span class="pi">:</span> <span class="s">&lt;tenant-id&gt;</span>
+  <span class="na">subscriptionId</span><span class="pi">:</span> <span class="s">&lt;subscription-id&gt;</span>               <span class="c1"># &lt;- This is the value of SUBSCRIPTION_ID environment variable</span>
+  <span class="na">resourceGroupName</span><span class="pi">:</span> <span class="s">&lt;promitor-resource-group-id&gt;</span> <span class="c1"># &lt;- This is the value of RG_NAME environment variable</span>
+<span class="na">metricDefaults</span><span class="pi">:</span>
+  <span class="na">aggregation</span><span class="pi">:</span>
+    <span class="na">interval</span><span class="pi">:</span> <span class="s">00:05:00</span>
+  <span class="na">scraping</span><span class="pi">:</span>
+    <span class="na">schedule</span><span class="pi">:</span> <span class="s2">"</span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>
+<span class="na">metrics</span><span class="pi">:</span>
+  <span class="pi">-</span> <span class="na">name</span><span class="pi">:</span> <span class="s">demo_queue_size</span>
+    <span class="na">description</span><span class="pi">:</span> <span class="s2">"</span><span class="s">Amount</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">active</span><span class="nv"> </span><span class="s">messages</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">'demo_queue'</span><span class="nv"> </span><span class="s">queue"</span>
+    <span class="na">resourceType</span><span class="pi">:</span> <span class="s">ServiceBusNamespace</span>
+    <span class="na">azureMetricConfiguration</span><span class="pi">:</span>
+      <span class="na">metricName</span><span class="pi">:</span> <span class="s">ActiveMessages</span>
+      <span class="na">aggregation</span><span class="pi">:</span>
+        <span class="na">type</span><span class="pi">:</span> <span class="s">Total</span>
+    <span class="na">resources</span><span class="pi">:</span>
+      <span class="pi">-</span> <span class="na">namespace</span><span class="pi">:</span> <span class="s">&lt;service-bus-namespace&gt;</span>        <span class="c1"># &lt;- This is the value of SERVICE_BUS_NAMESPACE environment variable</span>
+        <span class="na">queueName</span><span class="pi">:</span> <span class="s">&lt;service-bus-queue&gt;</span>            <span class="c1"># &lt;- This is the value of SERVICE_BUS_QUEUE_NAME environment variable</span>
+</code></pre></div></div>
+
+<h3 id="deploy-promitor-to-your-cluster-using-helm">Deploy Promitor to your cluster using Helm</h3>
+
+<p>To deploy, we’ll first add the Promitor chart repository to helm:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm repo add promitor https://charts.promitor.io/
+helm repo update
+</code></pre></div></div>
+
+<p>With this repository added, we can deploy Promitor:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>helm <span class="nb">install </span>promitor-agent-scraper promitor/promitor-agent-scraper <span class="nt">--values</span> your/path/to/metric-declaration.yaml
+</code></pre></div></div>
+
+<h3 id="verifying-the-scraped-output-in-promitor">Verifying the scraped output in Promitor</h3>
+
+<p>You can check that Promitor is getting insights from you Azure Service Bus queue, using the managed identity, with this commands.</p>
+
+<p>First, we get the name of the Promitor Scraper pod:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get promitor pod</span>
+<span class="nb">export </span><span class="nv">POD_NAME</span><span class="o">=</span><span class="si">$(</span>kubectl get pods <span class="nt">--namespace</span> default <span class="nt">-l</span> <span class="s2">"app.kubernetes.io/instance=promitor-agent-scraper"</span> <span class="nt">-o</span> <span class="nv">jsonpath</span><span class="o">=</span><span class="s2">"{.items[0].metadata.name}"</span><span class="si">)</span>
+</code></pre></div></div>
+
+<p>Next, we add port forwarding from our pod to our local machine:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>kubectl port-forward <span class="nt">--namespace</span> default <span class="nv">$POD_NAME</span> 8080:88
+</code></pre></div></div>
+
+<p>Now browse to the address <a href="http://127.0.0.1:8080/metrics">http://127.0.0.1:8080/metrics</a> and check your metrics are scrapped:</p>
+
+<div class="language-html highlighter-rouge"><div class="highlight"><pre class="highlight"><code># HELP demo_queue_size Amount of active messages of the 'demo_queue' queue
+# TYPE demo_queue_size gauge
+demo_queue_size{resource_group="ammdocs",subscription_id="xxxxx-xxxxx-xxxxx-xxxxxx-xxxxx",resource_uri="subscriptions/xxxxx-xxxxx-xxxxx-xxxxxx-xxxxx/resourceGroups/YOUR_RESOURCE_GROUP_NAME/providers/Microsoft.ServiceBus/namespaces/YOUR_SERVICE_BUS_NAMESPACE",instance_name="INSTANCE_NAME",entity_name="YOUR_SERVICE_BUS_QUEUE"} 0 1612952581417
+</code></pre></div></div>
+
+<h2 id="cleaning-up">Cleaning up</h2>
+
+<p>To delete all the resources used in this tutorial, run <code class="language-plaintext highlighter-rouge">az group delete --name $RG_NAME</code>.</p>
+
+<p><a href="/">← back</a></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>

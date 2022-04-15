@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+
+<!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Frequently asked questions (FAQs) | Promitor</title>
+<meta name="generator" content="Jekyll v3.9.0" />
+<meta property="og:title" content="Frequently asked questions (FAQs)" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Bringing Azure Monitor metrics where you need them." />
+<meta property="og:description" content="Bringing Azure Monitor metrics where you need them." />
+<link rel="canonical" href="http://localhost:4000/faq.html" />
+<meta property="og:url" content="http://localhost:4000/faq.html" />
+<meta property="og:site_name" content="Promitor" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Frequently asked questions (FAQs)" />
+<script type="application/ld+json">
+{"url":"http://localhost:4000/faq.html","headline":"Frequently asked questions (FAQs)","@type":"WebPage","description":"Bringing Azure Monitor metrics where you need them.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="/assets/css/style.css?v=9ff0961ef3542b529cf8dd86e3c897f7bdff10ec">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name"><a style="color:white;text-decoration:none" href="/">Promitor</a></h1>
+      <h2 class="project-tagline">Bringing Azure Monitor metrics where you need them.</h2>
+      
+        <a href="https://github.com/tomkerkhove/promitor" class="btn">View on GitHub</a>
+      
+      
+    </section>
+
+    <section class="main-content">
+      <p>Here are a list of questions you may have:</p>
+
+<ul>
+  <li><a href="#are-multi-dimensional-metrics-supported">Are multi-dimensional metrics supported?</a></li>
+  <li><a href="#how-does-promitor-handle-deleted-resources">How does Promitor handle deleted resources?</a></li>
+  <li><a href="#is-scraping-multiple-subscriptions-supported">Is scraping multiple subscriptions supported?</a></li>
+  <li><a href="#what-azure-clouds-are-supported">What Azure clouds are supported?</a></li>
+  <li><a href="#why-does-azure-blob--file-storage-only-report-account-level-information">Why does Azure Blob &amp; File Storage only report account-level information?</a></li>
+  <li><a href="#why-does-my-multi-dimensional-metric-report-label-value-unknown-with-prometheus">Why does my multi-dimensional metric report label value <code class="language-plaintext highlighter-rouge">unknown</code> with Prometheus?</a></li>
+  <li><a href="#what-helm-version-is-supported">What Helm version is supported?</a></li>
+  <li><a href="#what-operating-systems-are-supported">What operating systems are supported?</a></li>
+</ul>
+
+<h2 id="are-multi-dimensional-metrics-supported">Are multi-dimensional metrics supported?</h2>
+
+<p>Yes, every scraper supports scraping multi-dimensional metrics except for
+Azure Storage queues.</p>
+
+<p>You can configure the dimension you are interested in via
+<code class="language-plaintext highlighter-rouge">azureMetricConfiguration.dimension.Name</code>, for more information see
+our <a href="/configuration/v1.x/metrics/#metrics">‘Metric Configuration’ page</a>.</p>
+
+<p>However, you can only use it with metrics in Azure Monitor that support this,
+for a complete overview we recommend reading the
+<a href="https://docs.microsoft.com/en-us/azure/azure-monitor/platform/metrics-supported">official documentation</a>.</p>
+
+<h2 id="how-does-promitor-handle-deleted-resources">How does Promitor handle deleted resources?</h2>
+
+<p>The approach depends if you are using declarative metrics or resource discovery but we highly recommend to
+ <strong>enable Prometheus metric timestamps</strong> in <a href="/configuration/v2.x/runtime/scraper/#prometheus-scraping-endpoint">our runtime configuration</a>
+  to indicate how old the metric is.</p>
+
+<h3 id="when-using-declarative-metrics">When using declarative metrics</h3>
+
+<p>Promitor will scrape all resources that are configured and report the metrics accordingly. If that resource is deleted,
+ we will <strong>still serve the metrics as long as we can until it is no longer available and exceptions will be thrown</strong>.</p>
+
+<p>We <strong>recommend to update the metrics declaration when a resource is deleted</strong> to avoid polluting logs.</p>
+
+<h3 id="when-using-resource-discovery">When using resource discovery</h3>
+
+<p>Promitor will automatically discover all matching resources which means that <strong>it will automatically scrape metrics for
+ new/removed resources</strong>.</p>
+
+<p>Removed resources will immediately stop being scraped by Promitor, but still be reported in Prometheus scrape endpoint.</p>
+
+<h2 id="is-scraping-multiple-subscriptions-supported">Is scraping multiple subscriptions supported?</h2>
+
+<p>No, we do not support scraping multiple subscriptions as of today as we consider that to be a security boundary.</p>
+
+<p>However, you can deploy multiple instances of Promitor that each scrape another subscription.</p>
+
+<p>We have it on <a href="https://github.com/tomkerkhove/promitor/issues/761">our backlog</a> to see if there is
+ enough demand for it, feel free to give a <img class="emoji" title=":+1:" alt=":+1:" src="https://github.githubassets.com/images/icons/emoji/unicode/1f44d.png" height="20" width="20">. If that is the case, we will reconsider this limitation.</p>
+
+<h2 id="what-azure-clouds-are-supported">What Azure clouds are supported?</h2>
+
+<p>We support <code class="language-plaintext highlighter-rouge">Global</code> (default), <code class="language-plaintext highlighter-rouge">China</code>, <code class="language-plaintext highlighter-rouge">UsGov</code> &amp; <code class="language-plaintext highlighter-rouge">Germany</code> Azure clouds.</p>
+
+<p>This can be configured in the metric configuration under <code class="language-plaintext highlighter-rouge">azureMetadata</code>.</p>
+
+<p>For more information see our <a href="/configuration/v1.x/metrics/#metrics">‘Metric Configuration’ page</a>.</p>
+
+<h2 id="why-does-azure-blob--file-storage-only-report-account-level-information">Why does Azure Blob &amp; File Storage only report account-level information?</h2>
+
+<p>Azure Monitor currently only provides account-level metrics which we can serve.</p>
+
+<p>As part of <a href="https://github.com/tomkerkhove/promitor/issues/450">#450</a> &amp;
+ <a href="https://github.com/tomkerkhove/promitor/issues/446">#446</a> we plan to provide the capability to have more granular information.</p>
+
+<h2 id="why-does-my-multi-dimensional-metric-report-label-value-unknown-with-prometheus">Why does my multi-dimensional metric report label value <code class="language-plaintext highlighter-rouge">unknown</code> with Prometheus?</h2>
+
+<p>When Promitor is unable to find a metric for a multi-dimensional metric, it will report <code class="language-plaintext highlighter-rouge">unknown</code> for the dimension
+ label given it was not able to determine what the dimension value is due to the lack of metrics.</p>
+
+<p>You can read more about it in our <a href="/configuration/v2.x/runtime/scraper/#what-happens-when-metrics-are-unavailable-for-multi-dimensional-metrics">Prometheus sink documentation</a>.</p>
+
+<h2 id="what-helm-version-is-supported">What Helm version is supported?</h2>
+
+<p>Promitor supports deployments with <strong>Helm v3.0</strong> for all versions.</p>
+
+<p>Helm has <a href="https://helm.sh/blog/helm-v2-deprecation-timeline/">deprecated support for v2.0</a> and is out of support.
+ Because of that, Promitor supported to remove support for Helm 2.0 as of Promitor 2.0.</p>
+
+<p>However, while we don’t support it out-of-the-box it is possible that it is still compatible with Helm 2.0 but we do
+ not provide support for it.</p>
+
+<p>Join the discussion on our Helm v2.0 support deprecation on <a href="https://github.com/tomkerkhove/promitor/discussions/1375">GitHub Discussions</a>.</p>
+
+<h2 id="what-operating-systems-are-supported">What operating systems are supported?</h2>
+
+<p>We support running on both Linux &amp; Windows platforms.</p>
+
+<p><a href="/">← back</a></p>
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner">Promitor is maintained by <a href="https://github.com/tomkerkhove">Tom Kerkhove</a>.</span>
+        <span class="site-footer-credits">This page is using the <a href="https://github.com/pages-themes/cayman">Cayman template for Jekyll</a>.</span>
+        
+      </footer>
+    </section>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+        ga('create', 'UA-117259584-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>
