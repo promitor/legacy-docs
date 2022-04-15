@@ -15,7 +15,7 @@ You can easily run the documentation locally by using [Jekyll](https://jekyllrb.
 ❯  cd docs
 ```
 
-2. Serve documentation with Jekyll
+2. Serve documentation with Jekyll on [`http://127.0.0.1:4000`](http://127.0.0.1:4000)
 
 ```shell
 ⚡ tkerkhove@tomkerkhove C:\promitor-legacy-docs
